@@ -1,842 +1,415 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>4択回答シート</title>
-  <style>
-    :root {
-      --bg: #f5f5f7;
-      --card: #ffffff;
-      --panel: #f1f3f5;
-      --text: #222222;
-      --muted: #777777;
-      --border: #d8d8dc;
-      --accent: #5b67f1;
-      --accent-bg: #eef0ff;
-      --green: #22a447;
-      --green-bg: rgba(34, 164, 71, 0.14);
-      --red: #dc2626;
-      --red-bg: rgba(239, 68, 68, 0.14);
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    button, input { font: inherit; }
-
-    button {
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-
-    .app {
-      width: min(100%, 720px);
-      margin: 0 auto;
-      padding: 14px;
-    }
-
-    .stack { display: grid; gap: 12px; }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 14px;
-    }
-
-    .compact-card {
-      padding: 10px 12px;
-      border-radius: 12px;
-    }
-
-    .label {
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 5px;
-    }
-
-    .helper {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 5px;
-    }
-
-    .row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .field-input {
-      min-width: 0;
-      flex: 1;
-      height: 40px;
-      padding: 8px 11px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: transparent;
-      color: var(--text);
-      font-size: 16px;
-      outline: none;
-    }
-
-    .field-input:focus { border-color: var(--accent); }
-
-    .set-btn {
-      min-height: 40px;
-      border: 1px solid var(--accent);
-      background: var(--accent-bg);
-      color: var(--text);
-      border-radius: 10px;
-      padding: 7px 16px;
-      font-weight: 700;
-    }
-
-    .question-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .current-field {
-      font-size: 14px;
-      color: var(--muted);
-      margin-bottom: 3px;
-    }
-
-    .current-field strong { color: var(--text); }
-
-    .question-num {
-      font-size: 30px;
-      line-height: 1.1;
-      font-weight: 800;
-    }
-
-    .answered {
-      font-size: 14px;
-      color: var(--muted);
-      text-align: right;
-    }
-
-    .answered strong { color: var(--text); }
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-
-    .mode-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-
-    .mode-btn {
-      min-height: 48px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: transparent;
-      color: var(--text);
-      padding: 8px;
-      font-size: 14px;
-      font-weight: 700;
-    }
-
-    .mode-btn.active {
-      background: var(--accent-bg);
-      border-color: var(--accent);
-    }
-
-    .mode-hint {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .judge-card {
-      background: var(--panel);
-    }
-
-    .judge-title {
-      text-align: center;
-      font-weight: 700;
-      margin-bottom: 3px;
-    }
-
-    .judge-help {
-      text-align: center;
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 12px;
-    }
-
-    .mark-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-    }
-
-    .mark-btn {
-      min-height: 80px;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      background: var(--card);
-      color: var(--text);
-      padding: 8px 4px;
-    }
-
-    .mark-btn .num {
-      font-size: 21px;
-      font-weight: 800;
-    }
-
-    .mark-btn .mark {
-      margin-top: 4px;
-      font-size: 21px;
-      font-weight: 800;
-      color: var(--muted);
-    }
-
-    .derived {
-      margin-top: 12px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--card);
-      padding: 11px;
-      text-align: center;
-      font-size: 14px;
-      font-weight: 700;
-    }
-
-    .confirm-btn, .score-mode-btn {
-      width: 100%;
-      min-height: 48px;
-      border-radius: 12px;
-      font-weight: 800;
-      padding: 10px 14px;
-    }
-
-    .confirm-btn {
-      margin-top: 12px;
-      border: 1px solid var(--accent);
-      background: var(--accent-bg);
-      color: var(--text);
-    }
-
-    .nav-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .nav-btn, .reset-btn {
-      min-height: 44px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
-      border-radius: 12px;
-      padding: 8px 12px;
-      font-weight: 700;
-    }
-
-    .score-mode-btn {
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
-    }
-
-    .score-mode-btn.active {
-      background: var(--accent-bg);
-      border-color: var(--accent);
-    }
-
-    .hidden { display: none !important; }
-
-    .score-title { font-weight: 800; }
-
-    .overall-score {
-      margin-top: 10px;
-      font-size: 18px;
-      font-weight: 800;
-    }
-
-    .wrong-questions {
-      margin-top: 7px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .divider {
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-    }
-
-    .field-score-list {
-      display: grid;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .field-score-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      background: var(--panel);
-      border-radius: 11px;
-      padding: 9px 11px;
-    }
-
-    .field-score-name {
-      min-width: 0;
-      font-weight: 700;
-      overflow-wrap: anywhere;
-    }
-
-    .field-score-value {
-      flex: 0 0 auto;
-      font-size: 14px;
-      font-weight: 800;
-    }
-
-    .list-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .list-title { font-weight: 800; }
-
-    .list-hint {
-      font-size: 14px;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-
-    .answer-list {
-      display: grid;
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .field-heading {
-      font-size: 14px;
-      font-weight: 800;
-      margin-bottom: 7px;
-    }
-
-    .answer-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 7px;
-    }
-
-    .answer-grid.score {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .answer-btn {
-      min-height: 56px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
-      border-radius: 11px;
-      padding: 4px;
-      text-align: center;
-    }
-
-    .answer-num {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .answer-marks {
-      font-size: 12px;
-      font-weight: 700;
-      margin-top: 1px;
-    }
-
-    .answer-value {
-      font-size: 12px;
-      margin-top: 1px;
-    }
-
-    .score-card {
-      border: 1px solid var(--border);
-      background: var(--card);
-      border-radius: 12px;
-      padding: 8px;
-    }
-
-    .score-card-top {
-      width: 100%;
-      border: 0;
-      background: transparent;
-      color: var(--text);
-      padding: 0;
-      text-align: left;
-    }
-
-    .score-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 7px;
-      margin-top: 8px;
-    }
-
-    .grade-btn {
-      min-height: 44px;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      background: transparent;
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 800;
-    }
-
-    .grade-btn.correct.active {
-      background: var(--green-bg);
-      border-color: var(--green);
-    }
-
-    .grade-btn.wrong.active {
-      background: var(--red-bg);
-      border-color: var(--red);
-    }
-
-    .empty {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    @media (max-width: 430px) {
-      .app { padding: 10px; }
-      .question-num { font-size: 28px; }
-      .mode-btn { font-size: 13px; padding: 7px 4px; }
-      .mark-btn { min-height: 72px; }
-      .answer-grid { grid-template-columns: repeat(5, 1fr); gap: 5px; }
-      .answer-btn { min-height: 52px; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f6f7fb">
+<title>4択回答シート</title>
+<style>
+:root{
+  --bg:#f6f7fb;--card:#fff;--panel:#f0f2f6;--text:#202124;--muted:#70757a;
+  --border:#d9dce3;--accent:#5865f2;--accentbg:#eef0ff;
+  --green:#1f9d55;--greenbg:#eaf8ef;--red:#d93025;--redbg:#fdeceb;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input{font:inherit} button{cursor:pointer;touch-action:manipulation}
+.app{width:min(100%,720px);margin:auto;padding:12px}
+.stack{display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+.compact{padding:10px 12px;border-radius:12px}
+.label{font-size:12px;font-weight:700;margin-bottom:5px}
+.row{display:flex;gap:8px;align-items:center}
+input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px 11px;font-size:16px}
+.btn{min-height:44px;border:1px solid var(--border);border-radius:11px;background:#fff;color:var(--text);padding:8px 12px;font-weight:700}
+.btn.primary{border-color:var(--accent);background:var(--accentbg)}
+.helper,.muted{font-size:12px;color:var(--muted)}
+.qhead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.current-field{font-size:14px;color:var(--muted)} .current-field strong{color:var(--text)}
+.qnum{font-size:30px;font-weight:800;margin-top:2px}
+.answered{font-size:14px;color:var(--muted);text-align:right}
+.section-title{font-size:14px;font-weight:800;margin-bottom:8px}
+.mode-grid,.mark-grid,.nav-grid,.grade-grid{display:grid;gap:8px}
+.mode-grid{grid-template-columns:repeat(3,1fr)}
+.mark-grid{grid-template-columns:repeat(4,1fr)}
+.nav-grid{grid-template-columns:1fr 1fr}
+.mode{min-height:48px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:14px;font-weight:700}
+.mode.active{background:var(--accentbg);border-color:var(--accent)}
+.mode-hint{font-size:14px;color:var(--muted);margin-top:8px}
+.judge{background:var(--panel)}
+.judge-title{text-align:center;font-weight:800}
+.judge-help{text-align:center;font-size:12px;color:var(--muted);margin:4px 0 12px}
+.mark-btn{min-height:78px;border:1px solid var(--border);border-radius:16px;background:#fff}
+.mark-btn .n{font-size:21px;font-weight:800}.mark-btn .m{font-size:22px;font-weight:800;color:var(--muted);margin-top:3px}
+.mark-btn.o{background:var(--greenbg);border-color:var(--green)} .mark-btn.o .m{color:var(--green)}
+.mark-btn.x{background:var(--redbg);border-color:var(--red)} .mark-btn.x .m{color:var(--red)}
+.derived{margin-top:12px;border:1px solid var(--border);border-radius:12px;background:#fff;padding:10px;text-align:center;font-weight:700;font-size:14px}
+.full{width:100%}
+.hidden{display:none!important}
+.score-title{font-weight:800}.overall{font-size:18px;font-weight:800;margin-top:10px}.wrong{font-size:14px;color:var(--muted);margin-top:7px}
+.divider{border-top:1px solid var(--border);margin-top:14px;padding-top:12px}
+.field-scores,.answers{display:grid;gap:8px;margin-top:8px}
+.field-row{display:flex;justify-content:space-between;gap:10px;background:var(--panel);border-radius:10px;padding:9px 10px}
+.list-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.field-group{display:grid;gap:7px}.field-name{font-size:14px;font-weight:800}
+.answer-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.answer-grid.score{grid-template-columns:repeat(2,1fr)}
+.answer-mini,.score-card{border:1px solid var(--border);border-radius:11px;background:#fff}
+.answer-mini{min-height:54px;padding:5px;text-align:center}
+.answer-mini .small,.score-card .small{font-size:11px;color:var(--muted)}
+.answer-mini .marks{font-size:12px;font-weight:700}.answer-mini .val{font-size:12px}
+.score-card{padding:8px}.score-top{width:100%;border:0;background:transparent;text-align:left;padding:0}
+.grade-grid{grid-template-columns:1fr 1fr;margin-top:8px}
+.grade{min-height:42px;border:1px solid var(--border);border-radius:9px;background:#fff;font-weight:800}
+.grade.ok.active{background:var(--greenbg);border-color:var(--green)}
+.grade.ng.active{background:var(--redbg);border-color:var(--red)}
+@media(max-width:430px){.app{padding:10px}.mode{font-size:13px}.qnum{font-size:28px}}
+</style>
 </head>
 <body>
-  <main class="app">
-    <div class="stack">
-      <section class="card compact-card">
-        <label for="fieldInput" class="label">分野名</label>
-        <div class="row">
-          <input id="fieldInput" class="field-input" type="text" autocomplete="off" placeholder="例：民法・意思表示">
-          <button id="applyFieldBtn" class="set-btn" type="button">設定</button>
-        </div>
-        <div class="helper">未入力なら前の分野を引き継ぎます</div>
-      </section>
+<main class="app">
+<div class="stack">
 
-      <section class="card">
-        <div class="question-head">
-          <div>
-            <div class="current-field">現在の分野：<strong id="currentFieldLabel">未設定</strong></div>
-            <div class="question-num"><span id="qNum">1</span>問目</div>
-          </div>
-          <div class="answered">回答済み <strong id="answeredCount">0</strong>問</div>
-        </div>
-      </section>
+<section class="card compact">
+  <div class="label">分野名</div>
+  <div class="row">
+    <input id="fieldInput" type="text" autocomplete="off" placeholder="例：民法・意思表示">
+    <button id="setField" class="btn primary" type="button">設定</button>
+  </div>
+  <div class="helper" style="margin-top:5px">未入力なら前の分野を引き継ぎます</div>
+</section>
 
-      <section>
-        <div class="section-title">問題タイプ</div>
-        <div class="mode-grid">
-          <button type="button" data-mode="correct" class="mode-btn">正しいもの</button>
-          <button type="button" data-mode="wrong" class="mode-btn">誤っているもの</button>
-          <button type="button" data-mode="count" class="mode-btn">正しい数</button>
-        </div>
-        <div id="modeHint" class="mode-hint"></div>
-      </section>
-
-      <section class="card judge-card">
-        <div class="judge-title">各選択肢を判定</div>
-        <div class="judge-help">未判定 → ○ → × の順に切り替わります</div>
-
-        <div class="mark-grid">
-          <button type="button" data-index="1" class="mark-btn"><div class="num">①</div><div class="mark">－</div></button>
-          <button type="button" data-index="2" class="mark-btn"><div class="num">②</div><div class="mark">－</div></button>
-          <button type="button" data-index="3" class="mark-btn"><div class="num">③</div><div class="mark">－</div></button>
-          <button type="button" data-index="4" class="mark-btn"><div class="num">④</div><div class="mark">－</div></button>
-        </div>
-
-        <div id="derivedAnswer" class="derived">まだ答えは確定していません</div>
-        <button id="confirmBtn" type="button" class="confirm-btn">この問題を確定して次へ</button>
-      </section>
-
-      <section class="nav-grid">
-        <button id="prevBtn" type="button" class="nav-btn">← 前へ</button>
-        <button id="nextBtn" type="button" class="nav-btn">次へ →</button>
-      </section>
-
-      <section>
-        <button id="scoreModeBtn" type="button" class="score-mode-btn">採点モードにする</button>
-      </section>
-
-      <section id="scorePanel" class="card hidden">
-        <div class="score-title">採点結果</div>
-        <div id="overallScore" class="overall-score">まだ採点されていません</div>
-        <div id="wrongQuestions" class="wrong-questions"></div>
-
-        <div class="divider">
-          <div class="section-title">分野別</div>
-          <div id="fieldScores" class="field-score-list"></div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="list-header">
-          <div>
-            <div class="list-title">回答一覧</div>
-            <div id="listHint" class="list-hint">タップするとその問題に戻れます</div>
-          </div>
-          <button id="resetBtn" type="button" class="reset-btn">リセット</button>
-        </div>
-        <div id="answerList" class="answer-list"></div>
-        <div id="emptyState" class="empty">まだ回答はありません。</div>
-      </section>
+<section class="card">
+  <div class="qhead">
+    <div>
+      <div class="current-field">現在の分野：<strong id="fieldLabel">未設定</strong></div>
+      <div class="qnum"><span id="qNum">1</span>問目</div>
     </div>
-  </main>
+    <div class="answered">回答済み <strong id="answeredCount">0</strong>問</div>
+  </div>
+</section>
 
-  <script>
-    (() => {
-      let current = 1;
-      let currentMode = 'correct';
-      let currentField = '未設定';
-      let marks = [null, null, null, null];
-      let scoreMode = false;
-      const answers = new Map();
-      const grades = new Map();
+<section>
+  <div class="section-title">問題タイプ</div>
+  <div class="mode-grid">
+    <button class="mode active" data-mode="correct" type="button">正しいもの</button>
+    <button class="mode" data-mode="wrong" type="button">誤っているもの</button>
+    <button class="mode" data-mode="count" type="button">正しい数</button>
+  </div>
+  <div id="modeHint" class="mode-hint"></div>
+</section>
 
-      const qNum = document.getElementById('qNum');
-      const answeredCount = document.getElementById('answeredCount');
-      const modeHint = document.getElementById('modeHint');
-      const derivedAnswer = document.getElementById('derivedAnswer');
-      const currentFieldLabel = document.getElementById('currentFieldLabel');
-      const fieldInput = document.getElementById('fieldInput');
-      const answerList = document.getElementById('answerList');
-      const emptyState = document.getElementById('emptyState');
-      const scoreModeBtn = document.getElementById('scoreModeBtn');
-      const scorePanel = document.getElementById('scorePanel');
-      const overallScore = document.getElementById('overallScore');
-      const wrongQuestions = document.getElementById('wrongQuestions');
-      const fieldScores = document.getElementById('fieldScores');
-      const listHint = document.getElementById('listHint');
+<section class="card judge">
+  <div class="judge-title">各選択肢を判定</div>
+  <div class="judge-help">未判定 → ○ → × の順に切り替わります</div>
 
-      const modes = {
-        correct: { hint: '各肢を○×で判定。○が1つになれば、その番号が回答です。' },
-        wrong: { hint: '各肢を○×で判定。×が1つになれば、その番号が回答です。' },
-        count: { hint: '各肢を○×で判定。○の個数がそのまま回答になります。' }
+  <div class="mark-grid">
+    <button class="mark-btn" data-i="0" type="button"><div class="n">①</div><div class="m">－</div></button>
+    <button class="mark-btn" data-i="1" type="button"><div class="n">②</div><div class="m">－</div></button>
+    <button class="mark-btn" data-i="2" type="button"><div class="n">③</div><div class="m">－</div></button>
+    <button class="mark-btn" data-i="3" type="button"><div class="n">④</div><div class="m">－</div></button>
+  </div>
+
+  <div id="derived" class="derived">まだ答えは確定していません</div>
+  <button id="confirm" class="btn primary full" style="margin-top:12px" type="button">この問題を確定して次へ</button>
+</section>
+
+<section class="nav-grid">
+  <button id="prev" class="btn" type="button">← 前へ</button>
+  <button id="next" class="btn" type="button">次へ →</button>
+</section>
+
+<button id="scoreToggle" class="btn full" type="button">採点モードにする</button>
+
+<section id="scorePanel" class="card hidden">
+  <div class="score-title">採点結果</div>
+  <div id="overall" class="overall">まだ採点されていません</div>
+  <div id="wrong" class="wrong"></div>
+  <div class="divider">
+    <div class="section-title">分野別</div>
+    <div id="fieldScores" class="field-scores"></div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="list-head">
+    <div>
+      <div class="section-title" style="margin:0">回答一覧</div>
+      <div id="listHint" class="muted">タップするとその問題に戻れます</div>
+    </div>
+    <button id="reset" class="btn" type="button">リセット</button>
+  </div>
+  <div id="answerList" class="answers"></div>
+  <div id="empty" class="muted" style="margin-top:10px">まだ回答はありません。</div>
+</section>
+
+</div>
+</main>
+
+<script>
+(() => {
+  const STORAGE_KEY = "four_choice_sheet_v2";
+
+  let state = {
+    current: 1,
+    currentMode: "correct",
+    currentField: "未設定",
+    marks: [null,null,null,null],
+    scoreMode: false,
+    answers: {},
+    grades: {}
+  };
+
+  const $ = id => document.getElementById(id);
+  const modes = {
+    correct: "各肢を○×で判定。○が1つになれば、その番号が回答です。",
+    wrong: "各肢を○×で判定。×が1つになれば、その番号が回答です。",
+    count: "各肢を○×で判定。○の個数がそのまま回答になります。"
+  };
+
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (!s || typeof s !== "object") return;
+      state = {
+        current: Number.isInteger(s.current) && s.current > 0 ? s.current : 1,
+        currentMode: ["correct","wrong","count"].includes(s.currentMode) ? s.currentMode : "correct",
+        currentField: typeof s.currentField === "string" && s.currentField ? s.currentField : "未設定",
+        marks: Array.isArray(s.marks) && s.marks.length === 4 ? s.marks : [null,null,null,null],
+        scoreMode: !!s.scoreMode,
+        answers: s.answers && typeof s.answers === "object" ? s.answers : {},
+        grades: s.grades && typeof s.grades === "object" ? s.grades : {}
       };
+    } catch(e) {}
+  }
 
-      function derived() {
-        const circles = marks.reduce((a,v,i) => v === 'o' ? [...a, i + 1] : a, []);
-        const crosses = marks.reduce((a,v,i) => v === 'x' ? [...a, i + 1] : a, []);
+  function answerKeys() {
+    return Object.keys(state.answers).map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+  }
 
-        if (currentMode === 'correct') {
-          return circles.length === 1
-            ? { valid:true, value:circles[0], text:'回答：' + ['','①','②','③','④'][circles[0]] }
-            : { valid:false, text:'○を1つにすると回答が確定します' };
-        }
+  function derive() {
+    const circles = [];
+    const crosses = [];
+    state.marks.forEach((v,i)=>{ if(v==="o") circles.push(i+1); if(v==="x") crosses.push(i+1); });
 
-        if (currentMode === 'wrong') {
-          return crosses.length === 1
-            ? { valid:true, value:crosses[0], text:'回答：' + ['','①','②','③','④'][crosses[0]] }
-            : { valid:false, text:'×を1つにすると回答が確定します' };
-        }
+    if (state.currentMode === "correct") {
+      return circles.length === 1
+        ? {valid:true,value:circles[0],text:"回答："+["","①","②","③","④"][circles[0]]}
+        : {valid:false,text:"○を1つにすると回答が確定します"};
+    }
+    if (state.currentMode === "wrong") {
+      return crosses.length === 1
+        ? {valid:true,value:crosses[0],text:"回答："+["","①","②","③","④"][crosses[0]]}
+        : {valid:false,text:"×を1つにすると回答が確定します"};
+    }
+    const judged = state.marks.filter(Boolean).length;
+    return judged === 4
+      ? {valid:true,value:circles.length,text:"回答：正しいものは "+circles.length+" 個"}
+      : {valid:false,text:"4つすべて○×を付けると回答が確定します"};
+  }
 
-        const judged = marks.filter(Boolean).length;
-        return judged === 4
-          ? { valid:true, value:circles.length, text:'回答：正しいものは ' + circles.length + ' 個' }
-          : { valid:false, text:'4つすべて○×を付けると回答が確定します' };
+  function renderMarks() {
+    document.querySelectorAll(".mark-btn").forEach(btn=>{
+      const i = Number(btn.dataset.i);
+      const v = state.marks[i];
+      btn.classList.remove("o","x");
+      btn.querySelector(".m").textContent = "－";
+      if (v === "o") { btn.classList.add("o"); btn.querySelector(".m").textContent = "○"; }
+      if (v === "x") { btn.classList.add("x"); btn.querySelector(".m").textContent = "×"; }
+    });
+    const d = derive();
+    $("derived").textContent = d.text;
+    $("derived").style.borderColor = d.valid ? "var(--accent)" : "var(--border)";
+  }
+
+  function renderModes() {
+    document.querySelectorAll(".mode").forEach(b=>b.classList.toggle("active", b.dataset.mode===state.currentMode));
+    $("modeHint").textContent = modes[state.currentMode];
+  }
+
+  function renderScore() {
+    const keys = answerKeys().filter(n => Object.prototype.hasOwnProperty.call(state.grades, n));
+    if (!keys.length) {
+      $("overall").textContent = "まだ採点されていません";
+      $("wrong").textContent = "回答一覧で各問題を○・×で採点してください。";
+      $("fieldScores").innerHTML = "";
+      return;
+    }
+
+    const correct = keys.filter(n=>state.grades[n]===true);
+    const wrong = keys.filter(n=>state.grades[n]===false);
+    const rate = Math.round(correct.length / keys.length * 100);
+    $("overall").textContent = `${keys.length}問中 ${correct.length}問正解 / 正答率${rate}%`;
+    $("wrong").textContent = wrong.length ? `間違い：${wrong.join("、")}問` : "間違い：なし 🎉";
+
+    const stats = {};
+    keys.forEach(n=>{
+      const f = state.answers[n].field || "未設定";
+      if (!stats[f]) stats[f] = {correct:0,total:0};
+      stats[f].total++;
+      if (state.grades[n]===true) stats[f].correct++;
+    });
+
+    $("fieldScores").innerHTML = "";
+    Object.entries(stats).forEach(([field,s])=>{
+      const row = document.createElement("div");
+      row.className = "field-row";
+      const l = document.createElement("div");
+      l.style.fontWeight = "700";
+      l.textContent = field;
+      const r = document.createElement("div");
+      r.style.fontWeight = "800";
+      r.textContent = `${s.correct}/${s.total}　${Math.round(s.correct/s.total*100)}%`;
+      row.append(l,r);
+      $("fieldScores").appendChild(row);
+    });
+  }
+
+  function renderAnswers() {
+    $("answerList").innerHTML = "";
+    const keys = answerKeys();
+    $("empty").classList.toggle("hidden", keys.length>0);
+
+    let lastField = null, group = null, grid = null;
+    keys.forEach(n=>{
+      const item = state.answers[n];
+      if (item.field !== lastField) {
+        group = document.createElement("div");
+        group.className = "field-group";
+        const h = document.createElement("div");
+        h.className = "field-name";
+        h.textContent = item.field || "未設定";
+        group.appendChild(h);
+        grid = document.createElement("div");
+        grid.className = state.scoreMode ? "answer-grid score" : "answer-grid";
+        group.appendChild(grid);
+        $("answerList").appendChild(group);
+        lastField = item.field;
       }
 
-      function renderMarks() {
-        document.querySelectorAll('.mark-btn').forEach(btn => {
-          const i = Number(btn.dataset.index) - 1;
-          const mark = marks[i];
-          const markEl = btn.querySelector('.mark');
+      const marks = item.marks.map(v=>v==="o"?"○":v==="x"?"×":"－").join("");
+      const value = item.mode==="count" ? item.answer+"個" : ["","①","②","③","④"][item.answer];
 
-          btn.style.background = 'var(--card)';
-          btn.style.borderColor = 'var(--border)';
-          markEl.style.color = 'var(--muted)';
+      if (!state.scoreMode) {
+        const b = document.createElement("button");
+        b.className = "answer-mini";
+        b.type = "button";
+        b.innerHTML = `<div class="small">${n}</div><div class="marks">${marks}</div><div class="val">${value}</div>`;
+        b.addEventListener("click",()=>loadQuestion(n));
+        grid.appendChild(b);
+      } else {
+        const card = document.createElement("div");
+        card.className = "score-card";
+        const top = document.createElement("button");
+        top.type = "button";
+        top.className = "score-top";
+        top.innerHTML = `<div class="small">${n}問目</div><div style="font-size:14px;font-weight:700;margin-top:3px">${marks} → ${value}</div>`;
+        top.addEventListener("click",()=>loadQuestion(n));
+        card.appendChild(top);
 
-          if (mark === 'o') {
-            btn.style.background = 'var(--green-bg)';
-            btn.style.borderColor = 'var(--green)';
-            markEl.textContent = '○';
-            markEl.style.color = 'var(--green)';
-          } else if (mark === 'x') {
-            btn.style.background = 'var(--red-bg)';
-            btn.style.borderColor = 'var(--red)';
-            markEl.textContent = '×';
-            markEl.style.color = 'var(--red)';
-          } else {
-            markEl.textContent = '－';
-          }
-        });
+        const gg = document.createElement("div");
+        gg.className = "grade-grid";
 
-        const d = derived();
-        derivedAnswer.textContent = d.text;
-        derivedAnswer.style.borderColor = d.valid ? 'var(--accent)' : 'var(--border)';
+        const ok = document.createElement("button");
+        ok.className = "grade ok" + (state.grades[n]===true ? " active":"");
+        ok.type = "button"; ok.textContent = "○ 正解";
+        ok.addEventListener("click",()=>{state.grades[n]=true; save(); renderAnswers(); renderScore();});
+
+        const ng = document.createElement("button");
+        ng.className = "grade ng" + (state.grades[n]===false ? " active":"");
+        ng.type = "button"; ng.textContent = "× 不正解";
+        ng.addEventListener("click",()=>{state.grades[n]=false; save(); renderAnswers(); renderScore();});
+
+        gg.append(ok,ng); card.appendChild(gg); grid.appendChild(card);
       }
+    });
+  }
 
-      function renderModes() {
-        document.querySelectorAll('.mode-btn').forEach(btn => {
-          btn.classList.toggle('active', btn.dataset.mode === currentMode);
-        });
-        modeHint.textContent = modes[currentMode].hint;
-      }
+  function render() {
+    $("qNum").textContent = state.current;
+    $("answeredCount").textContent = answerKeys().length;
+    $("fieldLabel").textContent = state.currentField;
+    $("scoreToggle").textContent = state.scoreMode ? "回答モードに戻る" : "採点モードにする";
+    $("scoreToggle").classList.toggle("primary", state.scoreMode);
+    $("scorePanel").classList.toggle("hidden", !state.scoreMode);
+    $("listHint").textContent = state.scoreMode ? "問題集の解答を見ながら、○正解 / ×不正解をタップ" : "タップするとその問題に戻れます";
+    renderModes(); renderMarks(); renderAnswers();
+    if (state.scoreMode) renderScore();
+  }
 
-      function renderScoreSummary() {
-        const answeredKeys = [...answers.keys()].sort((a,b) => a-b);
-        const gradedKeys = answeredKeys.filter(num => grades.has(num));
-        const correctKeys = gradedKeys.filter(num => grades.get(num) === true);
-        const wrongKeys = gradedKeys.filter(num => grades.get(num) === false);
+  function loadQuestion(n) {
+    state.current = Math.max(1,n);
+    const item = state.answers[state.current];
+    if (item) {
+      state.currentMode = item.mode;
+      state.currentField = item.field;
+      state.marks = [...item.marks];
+    } else {
+      state.marks = [null,null,null,null];
+    }
+    save(); render();
+  }
 
-        if (gradedKeys.length === 0) {
-          overallScore.textContent = 'まだ採点されていません';
-          wrongQuestions.textContent = '回答一覧で各問題を○・×で採点してください。';
-          fieldScores.innerHTML = '';
-          return;
-        }
+  $("setField").addEventListener("click",()=>{
+    const v = $("fieldInput").value.trim();
+    if (v) state.currentField = v;
+    $("fieldInput").value = "";
+    save(); render();
+  });
 
-        const rate = Math.round((correctKeys.length / gradedKeys.length) * 100);
-        overallScore.textContent = gradedKeys.length + '問中 ' + correctKeys.length + '問正解 / 正答率' + rate + '%';
-        wrongQuestions.textContent = wrongKeys.length ? '間違い：' + wrongKeys.join('、') + '問' : '間違い：なし 🎉';
+  $("fieldInput").addEventListener("keydown",e=>{
+    if (e.key==="Enter") { e.preventDefault(); $("setField").click(); }
+  });
 
-        const stats = new Map();
-        gradedKeys.forEach(num => {
-          const item = answers.get(num);
-          if (!stats.has(item.field)) stats.set(item.field, { correct:0, total:0 });
-          const s = stats.get(item.field);
-          s.total += 1;
-          if (grades.get(num) === true) s.correct += 1;
-        });
+  document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>{
+    state.currentMode = btn.dataset.mode; save(); render();
+  }));
 
-        fieldScores.innerHTML = '';
-        stats.forEach((s, field) => {
-          const row = document.createElement('div');
-          row.className = 'field-score-row';
+  document.querySelectorAll(".mark-btn").forEach(btn=>btn.addEventListener("click",()=>{
+    const i = Number(btn.dataset.i);
+    state.marks[i] = state.marks[i]===null ? "o" : state.marks[i]==="o" ? "x" : null;
+    save(); renderMarks();
+  }));
 
-          const left = document.createElement('div');
-          left.className = 'field-score-name';
-          left.textContent = field;
+  $("confirm").addEventListener("click",()=>{
+    const d = derive();
+    if (!d.valid) { $("derived").textContent = d.text; return; }
+    state.answers[state.current] = {
+      field: state.currentField,
+      mode: state.currentMode,
+      marks: [...state.marks],
+      answer: d.value
+    };
+    state.current++;
+    state.marks = [null,null,null,null];
+    save(); render();
+  });
 
-          const right = document.createElement('div');
-          right.className = 'field-score-value';
-          right.textContent = s.correct + '/' + s.total + '　' + Math.round((s.correct / s.total) * 100) + '%';
+  $("prev").addEventListener("click",()=>loadQuestion(state.current-1));
+  $("next").addEventListener("click",()=>loadQuestion(state.current+1));
 
-          row.append(left, right);
-          fieldScores.appendChild(row);
-        });
-      }
+  $("scoreToggle").addEventListener("click",()=>{
+    state.scoreMode = !state.scoreMode; save(); render();
+  });
 
-      function renderList() {
-        answerList.innerHTML = '';
-        const keys = [...answers.keys()].sort((a,b) => a-b);
-        emptyState.classList.toggle('hidden', keys.length > 0);
+  $("reset").addEventListener("click",()=>{
+    if (!confirm("回答と採点結果をすべてリセットしますか？")) return;
+    state = {
+      current:1,currentMode:"correct",currentField:state.currentField,
+      marks:[null,null,null,null],scoreMode:false,answers:{},grades:{}
+    };
+    save(); render();
+  });
 
-        let lastField = null;
-        let group;
-        let grid;
-
-        keys.forEach(num => {
-          const item = answers.get(num);
-
-          if (item.field !== lastField) {
-            group = document.createElement('div');
-            const heading = document.createElement('div');
-            heading.className = 'field-heading';
-            heading.textContent = item.field;
-            group.appendChild(heading);
-
-            grid = document.createElement('div');
-            grid.className = scoreMode ? 'answer-grid score' : 'answer-grid';
-            group.appendChild(grid);
-            answerList.appendChild(group);
-            lastField = item.field;
-          }
-
-          const markText = item.marks.map(v => v === 'o' ? '○' : v === 'x' ? '×' : '－').join('');
-          const answerText = item.mode === 'count' ? item.answer + '個' : ['','①','②','③','④'][item.answer];
-
-          if (!scoreMode) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'answer-btn';
-            btn.innerHTML =
-              '<div class="answer-num">' + num + '</div>' +
-              '<div class="answer-marks">' + markText + '</div>' +
-              '<div class="answer-value">' + answerText + '</div>';
-            btn.addEventListener('click', () => loadQuestion(num));
-            grid.appendChild(btn);
-          } else {
-            const card = document.createElement('div');
-            card.className = 'score-card';
-
-            const top = document.createElement('button');
-            top.type = 'button';
-            top.className = 'score-card-top';
-            top.innerHTML =
-              '<div class="answer-num">' + num + '問目</div>' +
-              '<div style="margin-top:4px;font-size:14px;font-weight:700;">' + markText + ' → ' + answerText + '</div>';
-            top.addEventListener('click', () => loadQuestion(num));
-            card.appendChild(top);
-
-            const actions = document.createElement('div');
-            actions.className = 'score-actions';
-
-            const ok = document.createElement('button');
-            ok.type = 'button';
-            ok.className = 'grade-btn correct' + (grades.get(num) === true ? ' active' : '');
-            ok.textContent = '○ 正解';
-            ok.addEventListener('click', () => {
-              grades.set(num, true);
-              renderList();
-              renderScoreSummary();
-            });
-
-            const ng = document.createElement('button');
-            ng.type = 'button';
-            ng.className = 'grade-btn wrong' + (grades.get(num) === false ? ' active' : '');
-            ng.textContent = '× 不正解';
-            ng.addEventListener('click', () => {
-              grades.set(num, false);
-              renderList();
-              renderScoreSummary();
-            });
-
-            actions.append(ok, ng);
-            card.appendChild(actions);
-            grid.appendChild(card);
-          }
-        });
-      }
-
-      function render() {
-        qNum.textContent = current;
-        answeredCount.textContent = answers.size;
-        currentFieldLabel.textContent = currentField;
-        renderModes();
-        renderMarks();
-        renderList();
-        if (scoreMode) renderScoreSummary();
-      }
-
-      function loadQuestion(num) {
-        current = Math.max(1, num);
-        const saved = answers.get(current);
-
-        if (saved) {
-          currentMode = saved.mode;
-          currentField = saved.field;
-          marks = [...saved.marks];
-        } else {
-          marks = [null, null, null, null];
-        }
-
-        render();
-      }
-
-      function setField() {
-        const value = fieldInput.value.trim();
-        if (value) currentField = value;
-        fieldInput.value = '';
-        currentFieldLabel.textContent = currentField;
-      }
-
-      document.getElementById('applyFieldBtn').addEventListener('click', setField);
-
-      fieldInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          setField();
-        }
-      });
-
-      document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          currentMode = btn.dataset.mode;
-          renderModes();
-          renderMarks();
-        });
-      });
-
-      document.querySelectorAll('.mark-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const i = Number(btn.dataset.index) - 1;
-          marks[i] = marks[i] === null ? 'o' : marks[i] === 'o' ? 'x' : null;
-          renderMarks();
-        });
-      });
-
-      document.getElementById('confirmBtn').addEventListener('click', () => {
-        const d = derived();
-        if (!d.valid) {
-          derivedAnswer.textContent = d.text;
-          return;
-        }
-
-        answers.set(current, {
-          field: currentField,
-          mode: currentMode,
-          marks: [...marks],
-          answer: d.value
-        });
-
-        current += 1;
-        marks = [null, null, null, null];
-        render();
-      });
-
-      document.getElementById('prevBtn').addEventListener('click', () => loadQuestion(current - 1));
-      document.getElementById('nextBtn').addEventListener('click', () => loadQuestion(current + 1));
-
-      scoreModeBtn.addEventListener('click', () => {
-        scoreMode = !scoreMode;
-        scoreModeBtn.textContent = scoreMode ? '回答モードに戻る' : '採点モードにする';
-        scoreModeBtn.classList.toggle('active', scoreMode);
-        scorePanel.classList.toggle('hidden', !scoreMode);
-        listHint.textContent = scoreMode
-          ? '問題集の解答を見ながら、○正解 / ×不正解をタップ'
-          : 'タップするとその問題に戻れます';
-
-        renderList();
-        if (scoreMode) renderScoreSummary();
-      });
-
-      document.getElementById('resetBtn').addEventListener('click', () => {
-        if (!confirm('回答と採点結果をリセットしますか？')) return;
-
-        answers.clear();
-        grades.clear();
-        current = 1;
-        marks = [null, null, null, null];
-        scoreMode = false;
-        scoreModeBtn.textContent = '採点モードにする';
-        scoreModeBtn.classList.remove('active');
-        scorePanel.classList.add('hidden');
-        listHint.textContent = 'タップするとその問題に戻れます';
-        render();
-      });
-
-      render();
-    })();
-  </script>
+  load();
+  render();
+})();
+</script>
 </body>
 </html>
