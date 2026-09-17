@@ -28,6 +28,7 @@ button,input{font:inherit} button{cursor:pointer;touch-action:manipulation}
 .compact{padding:10px 12px;border-radius:12px}
 .label{font-size:12px;font-weight:700;margin-bottom:5px}
 .row{display:flex;gap:8px;align-items:center}
+.datetime-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.datetime-item{min-width:0}.datetime-item input{width:100%}
 input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px 11px;font-size:16px}
 .btn{min-height:44px;border:1px solid var(--border);border-radius:11px;background:#fff;color:var(--text);padding:8px 12px;font-weight:700}
 .btn.primary{border-color:var(--accent);background:var(--accentbg)}
@@ -71,6 +72,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 .grade{min-height:42px;border:1px solid var(--border);border-radius:9px;background:#fff;font-weight:800}
 .grade.ok.active{background:var(--greenbg);border-color:var(--green)}
 .grade.ng.active{background:var(--redbg);border-color:var(--red)}
+.share-box{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 10px;background:var(--panel);border-radius:10px;padding:10px;font-size:12px;line-height:1.55;color:var(--text);max-height:230px;overflow:auto}.copy-status{min-height:18px;margin-top:6px;text-align:center}.btn:disabled{opacity:.45;cursor:default}
 @media(max-width:430px){.app{padding:calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left))}.mode{font-size:13px}.qnum{font-size:28px}}
 </style>
 </head>
@@ -85,6 +87,21 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     <button id="setField" class="btn primary" type="button">設定</button>
   </div>
   <div class="helper" style="margin-top:5px">未入力なら前の分野を引き継ぎます</div>
+</section>
+
+<section class="card compact">
+  <div class="label">学習日時</div>
+  <div class="datetime-grid">
+    <div class="datetime-item">
+      <div class="helper" style="margin-bottom:4px">日付</div>
+      <input id="sessionDate" type="date">
+    </div>
+    <div class="datetime-item">
+      <div class="helper" style="margin-bottom:4px">時間</div>
+      <input id="sessionTime" type="time">
+    </div>
+  </div>
+  <div class="helper" style="margin-top:5px">現在日時が自動で入ります。必要なら変更できます</div>
 </section>
 
 <section class="card">
@@ -137,6 +154,13 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     <div class="section-title">分野別</div>
     <div id="fieldScores" class="field-scores"></div>
   </div>
+  <div class="divider">
+    <div class="section-title">ChatGPTに苦手分野を分析してもらう</div>
+    <div class="helper">日付・時間・採点結果・分野別成績・間違えた問題をまとめてコピーします</div>
+    <pre id="sharePreview" class="share-box">採点すると、ここに送信用の文章が表示されます。</pre>
+    <button id="copyResult" class="btn primary full" type="button" disabled>結果をコピー</button>
+    <div id="copyStatus" class="helper copy-status"></div>
+  </div>
 </section>
 
 <section class="card">
@@ -158,10 +182,23 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 (() => {
   const STORAGE_KEY = "four_choice_sheet_v2";
 
+  function currentDateTimeParts() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2,"0");
+    return {
+      date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+      time: `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    };
+  }
+
+  const initialDateTime = currentDateTimeParts();
+
   let state = {
     current: 1,
     currentMode: "correct",
     currentField: "未設定",
+    sessionDate: initialDateTime.date,
+    sessionTime: initialDateTime.time,
     marks: [null,null,null,null],
     scoreMode: false,
     answers: {},
@@ -189,6 +226,8 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
         current: Number.isInteger(s.current) && s.current > 0 ? s.current : 1,
         currentMode: ["correct","wrong","count"].includes(s.currentMode) ? s.currentMode : "correct",
         currentField: typeof s.currentField === "string" && s.currentField ? s.currentField : "未設定",
+        sessionDate: typeof s.sessionDate === "string" && s.sessionDate ? s.sessionDate : currentDateTimeParts().date,
+        sessionTime: typeof s.sessionTime === "string" && s.sessionTime ? s.sessionTime : currentDateTimeParts().time,
         marks: Array.isArray(s.marks) && s.marks.length === 4 ? s.marks : [null,null,null,null],
         scoreMode: !!s.scoreMode,
         answers: s.answers && typeof s.answers === "object" ? s.answers : {},
@@ -241,12 +280,75 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     $("modeHint").textContent = modes[state.currentMode];
   }
 
+  function formatDateJP(value) {
+    if (!value) return "未設定";
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    return m ? `${Number(m[1])}/${Number(m[2])}/${Number(m[3])}` : value;
+  }
+
+  function buildChatGPTText() {
+    const keys = answerKeys().filter(n => Object.prototype.hasOwnProperty.call(state.grades, n));
+    if (!keys.length) return "";
+
+    const correct = keys.filter(n=>state.grades[n]===true);
+    const wrong = keys.filter(n=>state.grades[n]===false);
+    const rate = Math.round(correct.length / keys.length * 100);
+    const stats = {};
+
+    keys.forEach(n=>{
+      const f = (state.answers[n] && state.answers[n].field) || "未設定";
+      if (!stats[f]) stats[f] = {correct:0,total:0};
+      stats[f].total++;
+      if (state.grades[n]===true) stats[f].correct++;
+    });
+
+    const lines = [
+      "宅建の4択問題を解きました。苦手分野を分析してください。",
+      "",
+      `日付：${formatDateJP(state.sessionDate)}`,
+      `時間：${state.sessionTime || "未設定"}`,
+      `全体：${keys.length}問中 ${correct.length}問正解 / 正答率${rate}%`,
+      `間違い：${wrong.length ? wrong.join("、") + "問" : "なし"}`,
+      "",
+      "【分野別】"
+    ];
+
+    Object.entries(stats).forEach(([field,s])=>{
+      lines.push(`${field}：${s.correct}/${s.total}（${Math.round(s.correct/s.total*100)}%）`);
+    });
+
+    if (wrong.length) {
+      lines.push("", "【間違えた問題の回答】");
+      wrong.forEach(n=>{
+        const item = state.answers[n];
+        if (!item) return;
+        const marks = item.marks.map(v=>v==="o"?"○":v==="x"?"×":"－").join("");
+        const value = item.mode==="count" ? `${item.answer}個` : ["","①","②","③","④"][item.answer];
+        lines.push(`${n}問目｜${item.field || "未設定"}｜各肢:${marks}｜回答:${value}`);
+      });
+    }
+
+    lines.push(
+      "",
+      "この結果から、①苦手分野 ②間違い方の傾向 ③復習の優先順位 ④次にやる勉強を3つ、分かりやすく教えてください。"
+    );
+
+    return lines.join("\n");
+  }
+
+  function updateSharePreview() {
+    const text = buildChatGPTText();
+    $("sharePreview").textContent = text || "採点すると、ここに送信用の文章が表示されます。";
+    $("copyResult").disabled = !text;
+  }
+
   function renderScore() {
     const keys = answerKeys().filter(n => Object.prototype.hasOwnProperty.call(state.grades, n));
     if (!keys.length) {
       $("overall").textContent = "まだ採点されていません";
       $("wrong").textContent = "回答一覧で各問題を○・×で採点してください。";
       $("fieldScores").innerHTML = "";
+      updateSharePreview();
       return;
     }
 
@@ -277,6 +379,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
       row.append(l,r);
       $("fieldScores").appendChild(row);
     });
+    updateSharePreview();
   }
 
   function renderAnswers() {
@@ -343,6 +446,8 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     $("qNum").textContent = state.current;
     $("answeredCount").textContent = answerKeys().length;
     $("fieldLabel").textContent = state.currentField;
+    $("sessionDate").value = state.sessionDate || "";
+    $("sessionTime").value = state.sessionTime || "";
     $("scoreToggle").textContent = state.scoreMode ? "回答モードに戻る" : "採点モードにする";
     $("scoreToggle").classList.toggle("primary", state.scoreMode);
     $("scorePanel").classList.toggle("hidden", !state.scoreMode);
@@ -363,6 +468,18 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     }
     save(); render();
   }
+
+  $("sessionDate").addEventListener("change",()=>{
+    state.sessionDate = $("sessionDate").value;
+    save();
+    if (state.scoreMode) renderScore();
+  });
+
+  $("sessionTime").addEventListener("change",()=>{
+    state.sessionTime = $("sessionTime").value;
+    save();
+    if (state.scoreMode) renderScore();
+  });
 
   $("setField").addEventListener("click",()=>{
     const v = $("fieldInput").value.trim();
@@ -406,10 +523,33 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     state.scoreMode = !state.scoreMode; save(); render();
   });
 
+  $("copyResult").addEventListener("click", async ()=>{
+    const text = buildChatGPTText();
+    if (!text) return;
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch(e) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      try { copied = document.execCommand("copy"); } catch(_) {}
+      ta.remove();
+    }
+    $("copyStatus").textContent = copied ? "コピーしました ✓　そのままChatGPTに貼り付けてOKです" : "コピーできませんでした。文章を長押ししてコピーしてください。";
+    if (copied) setTimeout(()=>{ $("copyStatus").textContent = ""; }, 2500);
+  });
+
   $("reset").addEventListener("click",()=>{
     if (!confirm("回答と採点結果をすべてリセットしますか？")) return;
+    const fresh = currentDateTimeParts();
     state = {
       current:1,currentMode:"correct",currentField:state.currentField,
+      sessionDate:fresh.date,sessionTime:fresh.time,
       marks:[null,null,null,null],scoreMode:false,answers:{},grades:{}
     };
     save(); render();
@@ -419,7 +559,6 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   render();
 })();
 </script>
-
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
