@@ -29,6 +29,7 @@ button,input{font:inherit} button{cursor:pointer;touch-action:manipulation}
 .label{font-size:12px;font-weight:700;margin-bottom:5px}
 .row{display:flex;gap:8px;align-items:center}
 .datetime-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.datetime-item{min-width:0}.datetime-item input{width:100%}
+.session-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.session-mode{min-height:54px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);font-weight:800;padding:8px}.session-mode.active{background:var(--accentbg);border-color:var(--accent)}.session-mode .sub{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-top:3px}.workbook-grade-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.workbook-grade{min-height:52px;border-radius:12px;font-weight:800;border:1px solid var(--border);background:#fff}.workbook-grade.ok{background:var(--greenbg);border-color:var(--green);color:#157340}.workbook-grade.ng{background:var(--redbg);border-color:var(--red);color:#a61f17}
 input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px 11px;font-size:16px}
 .btn{min-height:44px;border:1px solid var(--border);border-radius:11px;background:#fff;color:var(--text);padding:8px 12px;font-weight:700}
 .btn.primary{border-color:var(--accent);background:var(--accentbg)}
@@ -64,7 +65,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 .answer-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .answer-grid.score{grid-template-columns:repeat(2,1fr)}
 .answer-mini,.score-card{border:1px solid var(--border);border-radius:11px;background:#fff}
-.answer-mini{min-height:54px;padding:5px;text-align:center}
+.answer-mini{min-height:54px;padding:5px;text-align:center}.answer-mini.correct{background:var(--greenbg);border-color:var(--green)}.answer-mini.incorrect{background:var(--redbg);border-color:var(--red)}
 .answer-mini .small,.score-card .small{font-size:11px;color:var(--muted)}
 .answer-mini .marks{font-size:12px;font-weight:700}.answer-mini .val{font-size:12px}
 .score-card{padding:8px}.score-top{width:100%;border:0;background:transparent;text-align:left;padding:0}
@@ -79,6 +80,15 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 <body>
 <main class="app">
 <div class="stack">
+
+<section class="card compact">
+  <div class="label">学習形式</div>
+  <div class="session-mode-grid">
+    <button class="session-mode" data-session="workbook" type="button">問題集<span class="sub">1問ごとに正否を記録</span></button>
+    <button class="session-mode" data-session="exam" type="button">過去問・模試<span class="sub">最後にまとめて答え合わせ</span></button>
+  </div>
+  <div id="sessionModeHint" class="helper" style="margin-top:7px"></div>
+</section>
 
 <section class="card compact">
   <div class="label">分野名</div>
@@ -136,7 +146,16 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   </div>
 
   <div id="derived" class="derived">まだ答えは確定していません</div>
-  <button id="confirm" class="btn primary full" style="margin-top:12px" type="button">この問題を確定して次へ</button>
+  <div id="examConfirmWrap">
+    <button id="confirm" class="btn primary full" style="margin-top:12px" type="button">この問題を確定して次へ</button>
+  </div>
+  <div id="workbookGradeWrap" class="hidden" style="margin-top:12px">
+    <div class="helper" style="text-align:center">答え合わせしたら、その場で正否を記録</div>
+    <div class="workbook-grade-grid">
+      <button id="workbookCorrect" class="workbook-grade ok" type="button">○ 正解して次へ</button>
+      <button id="workbookWrong" class="workbook-grade ng" type="button">× 不正解で次へ</button>
+    </div>
+  </div>
 </section>
 
 <section class="nav-grid">
@@ -194,6 +213,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   const initialDateTime = currentDateTimeParts();
 
   let state = {
+    sessionType: "workbook",
     current: 1,
     currentMode: "correct",
     currentField: "未設定",
@@ -206,6 +226,10 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   };
 
   const $ = id => document.getElementById(id);
+  const sessionHints = {
+    workbook: "問題集モード：1問ごとに答え合わせし、○正解 / ×不正解を記録して次へ進みます。",
+    exam: "過去問・模試モード：回答だけ先に記録し、最後に採点モードでまとめて答え合わせします。"
+  };
   const modes = {
     correct: "各肢を○×で判定。○が1つになれば、その番号が回答です。",
     wrong: "各肢を○×で判定。×が1つになれば、その番号が回答です。",
@@ -223,6 +247,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
       const s = JSON.parse(raw);
       if (!s || typeof s !== "object") return;
       state = {
+        sessionType: ["workbook","exam"].includes(s.sessionType) ? s.sessionType : "exam",
         current: Number.isInteger(s.current) && s.current > 0 ? s.current : 1,
         currentMode: ["correct","wrong","count"].includes(s.currentMode) ? s.currentMode : "correct",
         currentField: typeof s.currentField === "string" && s.currentField ? s.currentField : "未設定",
@@ -303,8 +328,11 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     });
 
     const lines = [
-      "宅建の4択問題を解きました。苦手分野を分析してください。",
+      state.sessionType === "workbook"
+        ? "宅建の問題集を解きました。苦手分野を分析してください。"
+        : "宅建の過去問・模試を解きました。苦手分野を分析してください。",
       "",
+      `学習形式：${state.sessionType === "workbook" ? "問題集" : "過去問・模試"}`,
       `日付：${formatDateJP(state.sessionDate)}`,
       `時間：${state.sessionTime || "未設定"}`,
       `全体：${keys.length}問中 ${correct.length}問正解 / 正答率${rate}%`,
@@ -346,7 +374,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     const keys = answerKeys().filter(n => Object.prototype.hasOwnProperty.call(state.grades, n));
     if (!keys.length) {
       $("overall").textContent = "まだ採点されていません";
-      $("wrong").textContent = "回答一覧で各問題を○・×で採点してください。";
+      $("wrong").textContent = state.sessionType === "workbook" ? "各問題を解くたびに正否を入力すると、ここに集計されます。" : "回答一覧で各問題を○・×で採点してください。";
       $("fieldScores").innerHTML = "";
       updateSharePreview();
       return;
@@ -409,9 +437,11 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 
       if (!state.scoreMode) {
         const b = document.createElement("button");
-        b.className = "answer-mini";
+        const grade = state.grades[n];
+        b.className = "answer-mini" + (grade===true ? " correct" : grade===false ? " incorrect" : "");
         b.type = "button";
-        b.innerHTML = `<div class="small">${n}</div><div class="marks">${marks}</div><div class="val">${value}</div>`;
+        const gradeMark = grade===true ? " ○" : grade===false ? " ×" : "";
+        b.innerHTML = `<div class="small">${n}${gradeMark}</div><div class="marks">${marks}</div><div class="val">${value}</div>`;
         b.addEventListener("click",()=>loadQuestion(n));
         grid.appendChild(b);
       } else {
@@ -448,10 +478,16 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     $("fieldLabel").textContent = state.currentField;
     $("sessionDate").value = state.sessionDate || "";
     $("sessionTime").value = state.sessionTime || "";
-    $("scoreToggle").textContent = state.scoreMode ? "回答モードに戻る" : "採点モードにする";
+    document.querySelectorAll(".session-mode").forEach(b=>b.classList.toggle("active", b.dataset.session===state.sessionType));
+    $("sessionModeHint").textContent = sessionHints[state.sessionType];
+    $("examConfirmWrap").classList.toggle("hidden", state.sessionType !== "exam");
+    $("workbookGradeWrap").classList.toggle("hidden", state.sessionType !== "workbook");
+    $("scoreToggle").textContent = state.scoreMode ? (state.sessionType === "workbook" ? "問題入力に戻る" : "回答モードに戻る") : (state.sessionType === "workbook" ? "成績・正否を確認" : "採点モードにする");
     $("scoreToggle").classList.toggle("primary", state.scoreMode);
     $("scorePanel").classList.toggle("hidden", !state.scoreMode);
-    $("listHint").textContent = state.scoreMode ? "問題集の解答を見ながら、○正解 / ×不正解をタップ" : "タップするとその問題に戻れます";
+    $("listHint").textContent = state.scoreMode
+      ? (state.sessionType === "workbook" ? "○正解 / ×不正解をタップすると後から修正できます" : "問題集の解答を見ながら、○正解 / ×不正解をタップ")
+      : (state.sessionType === "workbook" ? "緑＝正解、赤＝不正解。タップするとその問題に戻れます" : "タップするとその問題に戻れます");
     renderModes(); renderMarks(); renderAnswers();
     if (state.scoreMode) renderScore();
   }
@@ -468,6 +504,51 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     }
     save(); render();
   }
+
+  function clearSessionDataForMode(newType) {
+    const fresh = currentDateTimeParts();
+    state.sessionType = newType;
+    state.current = 1;
+    state.marks = [null,null,null,null];
+    state.scoreMode = false;
+    state.answers = {};
+    state.grades = {};
+    state.sessionDate = fresh.date;
+    state.sessionTime = fresh.time;
+  }
+
+  document.querySelectorAll(".session-mode").forEach(btn=>btn.addEventListener("click",()=>{
+    const newType = btn.dataset.session;
+    if (newType === state.sessionType) return;
+    const hasData = answerKeys().length > 0 || Object.keys(state.grades).length > 0;
+    if (hasData) {
+      const label = newType === "workbook" ? "問題集" : "過去問・模試";
+      if (!confirm(`${label}モードに切り替えると、現在の回答・採点結果をリセットします。切り替えますか？`)) return;
+      clearSessionDataForMode(newType);
+    } else {
+      clearSessionDataForMode(newType);
+    }
+    save(); render();
+  }));
+
+  function saveCurrentWithGrade(isCorrect) {
+    const d = derive();
+    if (!d.valid) { $("derived").textContent = d.text; return; }
+    const n = state.current;
+    state.answers[n] = {
+      field: state.currentField,
+      mode: state.currentMode,
+      marks: [...state.marks],
+      answer: d.value
+    };
+    state.grades[n] = isCorrect;
+    state.current++;
+    state.marks = [null,null,null,null];
+    save(); render();
+  }
+
+  $("workbookCorrect").addEventListener("click",()=>saveCurrentWithGrade(true));
+  $("workbookWrong").addEventListener("click",()=>saveCurrentWithGrade(false));
 
   $("sessionDate").addEventListener("change",()=>{
     state.sessionDate = $("sessionDate").value;
@@ -503,6 +584,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   }));
 
   $("confirm").addEventListener("click",()=>{
+    if (state.sessionType !== "exam") return;
     const d = derive();
     if (!d.valid) { $("derived").textContent = d.text; return; }
     state.answers[state.current] = {
@@ -548,6 +630,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     if (!confirm("回答と採点結果をすべてリセットしますか？")) return;
     const fresh = currentDateTimeParts();
     state = {
+      sessionType:state.sessionType,
       current:1,currentMode:"correct",currentField:state.currentField,
       sessionDate:fresh.date,sessionTime:fresh.time,
       marks:[null,null,null,null],scoreMode:false,answers:{},grades:{}
