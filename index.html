@@ -28,7 +28,6 @@ button,input{font:inherit} button{cursor:pointer;touch-action:manipulation}
 .compact{padding:10px 12px;border-radius:12px}
 .label{font-size:12px;font-weight:700;margin-bottom:5px}
 .row{display:flex;gap:8px;align-items:center}
-.datetime-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.datetime-item{min-width:0}.datetime-item input{width:100%}
 .session-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.session-mode{min-height:54px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);font-weight:800;padding:8px}.session-mode.active{background:var(--accentbg);border-color:var(--accent)}.session-mode .sub{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-top:3px}.workbook-grade-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.workbook-grade{min-height:52px;border-radius:12px;font-weight:800;border:1px solid var(--border);background:#fff}.workbook-grade.ok{background:var(--greenbg);border-color:var(--green);color:#157340}.workbook-grade.ng{background:var(--redbg);border-color:var(--red);color:#a61f17}
 input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px 11px;font-size:16px}
 .btn{min-height:44px;border:1px solid var(--border);border-radius:11px;background:#fff;color:var(--text);padding:8px 12px;font-weight:700}
@@ -36,7 +35,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 .helper,.muted{font-size:12px;color:var(--muted)}
 .qhead{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .current-field{font-size:14px;color:var(--muted)} .current-field strong{color:var(--text)}
-.qnum{font-size:30px;font-weight:800;margin-top:2px}
+.qnum{font-size:30px;font-weight:800;margin-top:2px;color:#2664c7}
 .answered{font-size:14px;color:var(--muted);text-align:right}
 .section-title{font-size:14px;font-weight:800;margin-bottom:8px}
 .mode-grid,.mark-grid,.nav-grid,.grade-grid{display:grid;gap:8px}
@@ -93,25 +92,10 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 <section class="card compact">
   <div class="label">分野名</div>
   <div class="row">
-    <input id="fieldInput" type="text" autocomplete="off" placeholder="例：民法・意思表示">
+    <input id="fieldInput" type="text" autocomplete="off" placeholder="例：宅建業法26">
     <button id="setField" class="btn primary" type="button">設定</button>
   </div>
-  <div class="helper" style="margin-top:5px">未入力なら前の分野を引き継ぎます</div>
-</section>
-
-<section class="card compact">
-  <div class="label">学習日時</div>
-  <div class="datetime-grid">
-    <div class="datetime-item">
-      <div class="helper" style="margin-bottom:4px">日付</div>
-      <input id="sessionDate" type="date">
-    </div>
-    <div class="datetime-item">
-      <div class="helper" style="margin-bottom:4px">時間</div>
-      <input id="sessionTime" type="time">
-    </div>
-  </div>
-  <div class="helper" style="margin-top:5px">現在日時が自動で入ります。必要なら変更できます</div>
+  <div class="helper" style="margin-top:5px">例：宅建業法26 → 分野「宅建業法」・26問目。次は27問目になります</div>
 </section>
 
 <section class="card">
@@ -175,7 +159,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   </div>
   <div class="divider">
     <div class="section-title">ChatGPTに苦手分野を分析してもらう</div>
-    <div class="helper">日付・時間・採点結果・分野別成績・間違えた問題をまとめてコピーします</div>
+    <div class="helper">日付・各問題の開始／確定時刻・採点結果・分野別成績をまとめてコピーします</div>
     <pre id="sharePreview" class="share-box">採点すると、ここに送信用の文章が表示されます。</pre>
     <button id="copyResult" class="btn primary full" type="button" disabled>結果をコピー</button>
     <div id="copyStatus" class="helper copy-status"></div>
@@ -201,8 +185,8 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 (() => {
   const STORAGE_KEY = "four_choice_sheet_v2";
 
-  function currentDateTimeParts() {
-    const d = new Date();
+  function currentDateTimeParts(date = new Date()) {
+    const d = date;
     const pad = n => String(n).padStart(2,"0");
     return {
       date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
@@ -210,15 +194,14 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     };
   }
 
-  const initialDateTime = currentDateTimeParts();
-
   let state = {
     sessionType: "workbook",
     current: 1,
+    currentPaperNumber: 1,
+    currentStartedAt: new Date().toISOString(),
+    starts: {},
     currentMode: "correct",
     currentField: "未設定",
-    sessionDate: initialDateTime.date,
-    sessionTime: initialDateTime.time,
     marks: [null,null,null,null],
     scoreMode: false,
     answers: {},
@@ -233,7 +216,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   const modes = {
     correct: "各肢を○×で判定。○が1つになれば、その番号が回答です。",
     wrong: "各肢を○×で判定。×が1つになれば、その番号が回答です。",
-    count: "各肢を○×で判定。○の個数がそのまま回答になります。"
+    count: "ア～エを○×で判定。○を付けた文字の組み合わせが回答になります。"
   };
 
   function save() {
@@ -249,10 +232,12 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
       state = {
         sessionType: ["workbook","exam"].includes(s.sessionType) ? s.sessionType : "exam",
         current: Number.isInteger(s.current) && s.current > 0 ? s.current : 1,
+        currentPaperNumber: Number.isInteger(s.currentPaperNumber) && s.currentPaperNumber > 0 ? s.currentPaperNumber : (Number.isInteger(s.current) && s.current > 0 ? s.current : 1),
+        currentStartedAt: typeof s.currentStartedAt === "string" && !isNaN(Date.parse(s.currentStartedAt)) ? s.currentStartedAt : new Date().toISOString(),
+        starts: s.starts && typeof s.starts === "object" ? s.starts : {},
         currentMode: ["correct","wrong","count"].includes(s.currentMode) ? s.currentMode : "correct",
         currentField: typeof s.currentField === "string" && s.currentField ? s.currentField : "未設定",
-        sessionDate: typeof s.sessionDate === "string" && s.sessionDate ? s.sessionDate : currentDateTimeParts().date,
-        sessionTime: typeof s.sessionTime === "string" && s.sessionTime ? s.sessionTime : currentDateTimeParts().time,
+        legacySessionDate: typeof s.sessionDate === "string" ? s.sessionDate : s.legacySessionDate,
         marks: Array.isArray(s.marks) && s.marks.length === 4 ? s.marks : [null,null,null,null],
         scoreMode: !!s.scoreMode,
         answers: s.answers && typeof s.answers === "object" ? s.answers : {},
@@ -263,6 +248,25 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 
   function answerKeys() {
     return Object.keys(state.answers).map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+  }
+
+  function paperNumber(n) {
+    const item = state.answers[n];
+    return item && Number.isInteger(item.paperNumber) ? item.paperNumber : n;
+  }
+
+  function answerValue(item) {
+    if (item.mode !== "count") return ["","①","②","③","④"][item.answer] || "－";
+    if (typeof item.answer === "number" && Array.isArray(item.marks)) {
+      return item.marks.map((v,i)=>v === "o" ? "アイウエ"[i] : "").join("").split("").join("・") || "なし";
+    }
+    return item.answer;
+  }
+
+  function formatStamp(value) {
+    if (!value || isNaN(Date.parse(value))) return "記録なし";
+    const d = new Date(value), pad = n => String(n).padStart(2,"0");
+    return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
 
   function derive() {
@@ -281,8 +285,9 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
         : {valid:false,text:"×を1つにすると回答が確定します"};
     }
     const judged = state.marks.filter(Boolean).length;
+    const combination = circles.map(n=>"アイウエ"[n-1]).join("・") || "なし";
     return judged === 4
-      ? {valid:true,value:circles.length,text:"回答：正しいものは "+circles.length+" 個"}
+      ? {valid:true,value:combination,text:"回答："+combination}
       : {valid:false,text:"4つすべて○×を付けると回答が確定します"};
   }
 
@@ -291,6 +296,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
       const i = Number(btn.dataset.i);
       const v = state.marks[i];
       btn.classList.remove("o","x");
+      btn.querySelector(".n").textContent = state.currentMode === "count" ? "アイウエ"[i] : ["①","②","③","④"][i];
       btn.querySelector(".m").textContent = "－";
       if (v === "o") { btn.classList.add("o"); btn.querySelector(".m").textContent = "○"; }
       if (v === "x") { btn.classList.add("x"); btn.querySelector(".m").textContent = "×"; }
@@ -327,16 +333,18 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
       if (state.grades[n]===true) stats[f].correct++;
     });
 
+    const first = state.answers[answerKeys()[0]];
+    const sessionDate = first && first.startedAt ? currentDateTimeParts(new Date(first.startedAt)).date : (state.legacySessionDate || currentDateTimeParts().date);
     const lines = [
+      `日付：${formatDateJP(sessionDate)}`,
+      "",
       state.sessionType === "workbook"
         ? "宅建の問題集を解きました。苦手分野を分析してください。"
         : "宅建の過去問・模試を解きました。苦手分野を分析してください。",
       "",
       `学習形式：${state.sessionType === "workbook" ? "問題集" : "過去問・模試"}`,
-      `日付：${formatDateJP(state.sessionDate)}`,
-      `時間：${state.sessionTime || "未設定"}`,
       `全体：${keys.length}問中 ${correct.length}問正解 / 正答率${rate}%`,
-      `間違い：${wrong.length ? wrong.join("、") + "問" : "なし"}`,
+      `間違い：${wrong.length ? wrong.map(n=>paperNumber(n)).join("、") + "問" : "なし"}`,
       "",
       "【分野別】"
     ];
@@ -351,10 +359,15 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
         const item = state.answers[n];
         if (!item) return;
         const marks = item.marks.map(v=>v==="o"?"○":v==="x"?"×":"－").join("");
-        const value = item.mode==="count" ? `${item.answer}個` : ["","①","②","③","④"][item.answer];
-        lines.push(`${n}問目｜${item.field || "未設定"}｜各肢:${marks}｜回答:${value}`);
+        lines.push(`${paperNumber(n)}問目｜${item.field || "未設定"}｜各肢:${marks}｜回答:${answerValue(item)}`);
       });
     }
+
+    lines.push("", "【各問題の時間ログ】");
+    answerKeys().forEach(n=>{
+      const item = state.answers[n];
+      lines.push(`${paperNumber(n)}問目｜${item.field || "未設定"}｜開始:${formatStamp(item.startedAt)}｜確定:${formatStamp(item.endedAt)}`);
+    });
 
     lines.push(
       "",
@@ -384,7 +397,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     const wrong = keys.filter(n=>state.grades[n]===false);
     const rate = Math.round(correct.length / keys.length * 100);
     $("overall").textContent = `${keys.length}問中 ${correct.length}問正解 / 正答率${rate}%`;
-    $("wrong").textContent = wrong.length ? `間違い：${wrong.join("、")}問` : "間違い：なし 🎉";
+    $("wrong").textContent = wrong.length ? `間違い：${wrong.map(n=>paperNumber(n)).join("、")}問` : "間違い：なし 🎉";
 
     const stats = {};
     keys.forEach(n=>{
@@ -433,7 +446,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
       }
 
       const marks = item.marks.map(v=>v==="o"?"○":v==="x"?"×":"－").join("");
-      const value = item.mode==="count" ? item.answer+"個" : ["","①","②","③","④"][item.answer];
+      const value = answerValue(item);
 
       if (!state.scoreMode) {
         const b = document.createElement("button");
@@ -441,7 +454,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
         b.className = "answer-mini" + (grade===true ? " correct" : grade===false ? " incorrect" : "");
         b.type = "button";
         const gradeMark = grade===true ? " ○" : grade===false ? " ×" : "";
-        b.innerHTML = `<div class="small">${n}${gradeMark}</div><div class="marks">${marks}</div><div class="val">${value}</div>`;
+        b.innerHTML = `<div class="small">${paperNumber(n)}問目${gradeMark}</div><div class="marks">${marks}</div><div class="val">${value}</div>`;
         b.addEventListener("click",()=>loadQuestion(n));
         grid.appendChild(b);
       } else {
@@ -450,7 +463,7 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
         const top = document.createElement("button");
         top.type = "button";
         top.className = "score-top";
-        top.innerHTML = `<div class="small">${n}問目</div><div style="font-size:14px;font-weight:700;margin-top:3px">${marks} → ${value}</div>`;
+        top.innerHTML = `<div class="small">${paperNumber(n)}問目</div><div style="font-size:14px;font-weight:700;margin-top:3px">${marks} → ${value}</div>`;
         top.addEventListener("click",()=>loadQuestion(n));
         card.appendChild(top);
 
@@ -473,11 +486,9 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   }
 
   function render() {
-    $("qNum").textContent = state.current;
+    $("qNum").textContent = state.currentPaperNumber;
     $("answeredCount").textContent = answerKeys().length;
     $("fieldLabel").textContent = state.currentField;
-    $("sessionDate").value = state.sessionDate || "";
-    $("sessionTime").value = state.sessionTime || "";
     document.querySelectorAll(".session-mode").forEach(b=>b.classList.toggle("active", b.dataset.session===state.sessionType));
     $("sessionModeHint").textContent = sessionHints[state.sessionType];
     $("examConfirmWrap").classList.toggle("hidden", state.sessionType !== "exam");
@@ -493,28 +504,37 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
   }
 
   function loadQuestion(n) {
+    const previous = state.current;
+    const previousPaper = state.currentPaperNumber;
+    if (!state.answers[previous] && state.currentStartedAt) state.starts[previous] = state.currentStartedAt;
     state.current = Math.max(1,n);
     const item = state.answers[state.current];
     if (item) {
       state.currentMode = item.mode;
       state.currentField = item.field;
+      state.currentPaperNumber = paperNumber(state.current);
+      state.currentStartedAt = item.startedAt || null;
       state.marks = [...item.marks];
     } else {
+      state.currentPaperNumber = Math.max(1, previousPaper + state.current - previous);
+      state.currentStartedAt = state.starts[state.current] || new Date().toISOString();
+      state.starts[state.current] = state.currentStartedAt;
       state.marks = [null,null,null,null];
     }
     save(); render();
   }
 
   function clearSessionDataForMode(newType) {
-    const fresh = currentDateTimeParts();
     state.sessionType = newType;
     state.current = 1;
+    state.currentPaperNumber = 1;
+    state.currentStartedAt = new Date().toISOString();
+    state.starts = {};
     state.marks = [null,null,null,null];
     state.scoreMode = false;
     state.answers = {};
     state.grades = {};
-    state.sessionDate = fresh.date;
-    state.sessionTime = fresh.time;
+    state.legacySessionDate = null;
   }
 
   document.querySelectorAll(".session-mode").forEach(btn=>btn.addEventListener("click",()=>{
@@ -535,36 +555,45 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     const d = derive();
     if (!d.valid) { $("derived").textContent = d.text; return; }
     const n = state.current;
-    state.answers[n] = {
-      field: state.currentField,
-      mode: state.currentMode,
-      marks: [...state.marks],
-      answer: d.value
-    };
+    const endedAt = new Date().toISOString();
+    recordAnswer(d.value, endedAt);
     state.grades[n] = isCorrect;
     state.current++;
+    state.currentPaperNumber++;
+    state.currentStartedAt = endedAt;
+    state.starts[state.current] = endedAt;
     state.marks = [null,null,null,null];
     save(); render();
+  }
+
+  function recordAnswer(value, endedAt) {
+    const previous = state.answers[state.current];
+    state.answers[state.current] = {
+      field: state.currentField,
+      paperNumber: state.currentPaperNumber,
+      mode: state.currentMode,
+      marks: [...state.marks],
+      answer: value,
+      startedAt: previous && previous.startedAt || state.starts[state.current] || state.currentStartedAt || endedAt,
+      endedAt
+    };
   }
 
   $("workbookCorrect").addEventListener("click",()=>saveCurrentWithGrade(true));
   $("workbookWrong").addEventListener("click",()=>saveCurrentWithGrade(false));
 
-  $("sessionDate").addEventListener("change",()=>{
-    state.sessionDate = $("sessionDate").value;
-    save();
-    if (state.scoreMode) renderScore();
-  });
-
-  $("sessionTime").addEventListener("change",()=>{
-    state.sessionTime = $("sessionTime").value;
-    save();
-    if (state.scoreMode) renderScore();
-  });
-
   $("setField").addEventListener("click",()=>{
     const v = $("fieldInput").value.trim();
-    if (v) state.currentField = v;
+    if (v) {
+      const ascii = v.replace(/[０-９]/g, digit=>String.fromCharCode(digit.charCodeAt(0)-65248));
+      const match = /^(.+?)[\s　]*(\d+)[\s　]*(?:問目|問)?$/.exec(ascii);
+      if (match && match[1].trim() && Number(match[2]) > 0) {
+        state.currentField = match[1].trim();
+        state.currentPaperNumber = Number(match[2]);
+      } else {
+        state.currentField = v;
+      }
+    }
     $("fieldInput").value = "";
     save(); render();
   });
@@ -587,13 +616,12 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
     if (state.sessionType !== "exam") return;
     const d = derive();
     if (!d.valid) { $("derived").textContent = d.text; return; }
-    state.answers[state.current] = {
-      field: state.currentField,
-      mode: state.currentMode,
-      marks: [...state.marks],
-      answer: d.value
-    };
+    const endedAt = new Date().toISOString();
+    recordAnswer(d.value, endedAt);
     state.current++;
+    state.currentPaperNumber++;
+    state.currentStartedAt = endedAt;
+    state.starts[state.current] = endedAt;
     state.marks = [null,null,null,null];
     save(); render();
   });
@@ -628,11 +656,9 @@ input{min-width:0;flex:1;height:40px;border:1px solid var(--border);border-radiu
 
   $("reset").addEventListener("click",()=>{
     if (!confirm("回答と採点結果をすべてリセットしますか？")) return;
-    const fresh = currentDateTimeParts();
     state = {
       sessionType:state.sessionType,
-      current:1,currentMode:"correct",currentField:state.currentField,
-      sessionDate:fresh.date,sessionTime:fresh.time,
+      current:1,currentPaperNumber:1,currentStartedAt:new Date().toISOString(),starts:{},currentMode:"correct",currentField:state.currentField,
       marks:[null,null,null,null],scoreMode:false,answers:{},grades:{}
     };
     save(); render();
